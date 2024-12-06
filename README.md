@@ -1,0 +1,1 @@
+Esp32_Xeneric enables rapid deployment of ESP32-based sensors transmitting measurements (strings, doubles, or arrays) via Wi-Fi to a server. It supports quick integration of sensors for temperature, humidity, ... and more, offering an efficient solution for long-term data acquisition and recording systems.
