@@ -1,4 +1,3 @@
-// Frame wifi
 #include "FrameWeb.h"
 FrameWeb frame;
 
@@ -9,7 +8,15 @@ FrameWeb frame;
 #include <SPI.h>
 #include "SparkFunBME280.h"
 
-int count = 0 ;
+// Server
+#define SERVER "opadegp-datagateway.cern.ch"
+#define PORT 8080
+#define PAGE "/setvalue/set?"
+
+// Debug macro 
+#define DEBUG_MAIN
+
+// Variable used in this sample
 BME280 sensor01;
 BME280 sensor02;
 BME280 sensor03;
@@ -17,30 +24,30 @@ BME280 sensor04;
 float h01, h02, h03, h04;
 float t01, t02, t03, t04;
 float p01, p02, p03, p04;
-
 const char VERSION[] ="0.0.1";
-
-// Debug macro 
-#define DEBUG_MAIN
-
 int8_t wifiLost = 0;
+uint32_t wdCounter = 0;
+int second =  0;
+HTTPClient http;
+char temp[1024];
 
 // Internal led
 #define EspLedBlue 2
 long previousMillis = 0;
 
-// Frame option
+// Frame option config and web-socket NOT USE
 void saveConfigCallback() {}
-
-// -------------------- WebSockwt functions see Data/websocket.html/js ------------------------
-
-// Json Variable to Hold Sensor Readings
-void webSocketSend(uint8_t num) {}
-void decodeJson(uint8_t num, WStype_t type, uint8_t * payload, size_t length)  {}
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {}
 
+#define sendGet(format, ...) { \
+  snprintf(temp, 1024, format, __VA_ARGS__); \
+  String url =  String(PAGE) + String(temp); \
+  http.begin(SERVER, PORT, url); \
+  int httpCode = http.GET(); \
+  http.end(); \
+}
+
 // -------- WatchDog ----------------------------
-uint32_t wdCounter = 0;
 void watchdog(void *pvParameter) {
   while (1) {
     vTaskDelay(5000/portTICK_RATE_MS); // Wait 5 sec
@@ -64,18 +71,6 @@ void configModeCallback (WiFiManager *myWiFiManager) {
   #endif
 }
 
-int second =  0;
-HTTPClient http;
-char temp[1024];
-
-#define sendGet(format, ...) { \
-  snprintf(temp, 1024, format, __VA_ARGS__); \
-  String url =  String("/setvalue/set?") + String(temp); \
-  http.begin("opadegp-datagateway.cern.ch", 8080, url); \
-  int httpCode = http.GET(); \
-  http.end(); \
-}
-
 // setup -------------------------------------------------------------------------
 void setup() {
 
@@ -87,7 +82,8 @@ void setup() {
   // Set pin mode  I/O Directions
   pinMode(EspLedBlue, OUTPUT);     // Led is BLUE at statup
   digitalWrite(EspLedBlue, HIGH);  // After 5 seconds blinking indicate WiFI ids OK
-   // Start my WatchDog olso used to reset AP evey 15m (Some time after general cut off Wifi host is started after Eps)
+
+   // Start WatchDog used to reset AP evey 15m (Some time after general cut off Wifi host is started after Eps)
   xTaskCreate(&watchdog, "wd task", 2048, NULL, 5, NULL);
   
   // Start Html framework
@@ -155,38 +151,45 @@ void loop() {
       wifiLost = 0;
     }
 
-    h01 = sensor01.readFloatHumidity();
-    h02 = sensor02.readFloatHumidity();
-    h03 = sensor03.readFloatHumidity();
-    h04 = sensor04.readFloatHumidity();
-    p01 = sensor01.readFloatPressure();
-    p02 = sensor02.readFloatPressure();
-    p03 = sensor03.readFloatPressure();
-    p04 = sensor04.readFloatPressure();
-    t01 = sensor01.readTempC();
-    t02 = sensor02.readTempC();
-    t03 = sensor03.readTempC();
-    t04 = sensor04.readTempC();
+    // read some sensors
+    if (second==0) {
+      h01 = sensor01.readFloatHumidity();
+      h02 = sensor02.readFloatHumidity();
+      h03 = sensor03.readFloatHumidity();
+      h04 = sensor04.readFloatHumidity();
+      p01 = sensor01.readFloatPressure();
+      p02 = sensor02.readFloatPressure();
+      p03 = sensor03.readFloatPressure();
+      p04 = sensor04.readFloatPressure();
+      t01 = sensor01.readTempC();
+      t02 = sensor02.readTempC();
+      t03 = sensor03.readTempC();
+      t04 = sensor04.readTempC();
+    }
+
+    // Notify
     if (second==1) {
       sendGet("dcr_temp01=%g", t01);
       sendGet("dcr_temp02=%g", t02);
       sendGet("dcr_temp03=%g", t03);
       sendGet("dcr_temp04=%g", t04);
     }
-    if (second==2) {
+    else if (second==2) {
       sendGet("dcr_rh01=%g", h01);
       sendGet("dcr_rh02=%g", h02);
       sendGet("dcr_rh03=%g", h03);
       sendGet("dcr_rh04=%g", h04);
     }
-    if (second==4) {
+    else if (second==4) {
       sendGet("dcr_ap01=%g", p01);
       sendGet("dcr_ap02=%g", p02);
       sendGet("dcr_ap03=%g", p03);
       sendGet("dcr_ap04=%g", p04);
     }
-    if (second>4) second=0;
+    else if (second>4) {
+      second=0;
+    }
 
-  } // End 5 second
+  } // End 1 second
 
 } // End loop
