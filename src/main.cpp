@@ -123,7 +123,6 @@ void loop() {
   // Is alive executed every 1 sec.
   if ( millis() - previousMillis > 1000L) {
     previousMillis = millis();
-    second++;
     digitalWrite(EspLedBlue, !digitalRead(EspLedBlue));
 
     int wifistat = WiFi.status();
@@ -186,7 +185,9 @@ void loop() {
       sendGet("dcr_ap03=%g", p03);
       sendGet("dcr_ap04=%g", p04);
     }
-    else if (second>4) {
+    
+    second++;
+    if (second>4) {
       second=0;
     }
 
